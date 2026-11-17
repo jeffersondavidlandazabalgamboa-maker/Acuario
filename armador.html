@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arma tu acuario · AquaVida</title>
+<style>
+:root{--bg:#f2f8f7;--card:#fff;--ink:#12303a;--mut:#58757d;--line:#cfe2e0;--acc:#0b7a75;--acc2:#e8743b;--water:#7cc8d8}
+@media (prefers-color-scheme:dark){:root{--bg:#0d1f26;--card:#14303a;--ink:#e6f3f2;--mut:#9bbcc0;--line:#25505c;--acc:#4cc7bd;--acc2:#f29a68}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Trebuchet MS",Verdana,sans-serif}
+h1,h2,h3{font-family:Georgia,"Times New Roman",serif;margin:0 0 .4rem}
+header{padding:1.5rem 1rem .5rem;max-width:1200px;margin:auto}
+header p{margin:0;color:var(--mut);max-width:60ch}
+main{max-width:1200px;margin:auto;padding:1rem;display:grid;grid-template-columns:1fr 420px;gap:1.2rem}
+@media(max-width:900px){main{grid-template-columns:1fr}}
+.tanks{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:1rem;align-content:start}
+.tank{background:var(--card);border:2px solid var(--line);border-radius:14px;padding:.8rem;cursor:pointer;text-align:left;color:inherit;font:inherit}
+.tank:hover,.tank:focus-visible{border-color:var(--acc)}
+.tank[aria-pressed=true]{border-color:var(--acc2);box-shadow:0 0 0 3px color-mix(in srgb,var(--acc2) 30%,transparent)}
+.tank img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px;display:block;background:#fff}
+.tank b{display:block;margin-top:.4rem}.tank small{color:var(--mut)}
+aside{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:1rem;position:sticky;top:.8rem;align-self:start;max-height:calc(100vh - 1.6rem);overflow:auto}
+@media(max-width:900px){aside{position:static;max-height:none}}
+.grp{margin:1rem 0 .3rem;font-weight:bold}
+.chips{display:flex;flex-wrap:wrap;gap:.4rem}
+.chip{display:flex;align-items:center;gap:.4rem;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:.2rem .7rem .2rem .2rem;font:inherit;font-size:.9rem;cursor:pointer}
+.chip img{width:34px;height:34px;object-fit:cover;border-radius:50%}
+.chip.t{padding:.35rem .8rem}
+.chip[aria-pressed=true]{background:var(--acc);border-color:var(--acc);color:#fff}
+.chip:disabled{opacity:.4;cursor:not-allowed}
+.note{font-size:.85rem;color:var(--mut)}.warn{color:var(--acc2);font-size:.9rem;margin:.4rem 0}
+select,textarea{width:100%;font:inherit;padding:.5rem;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+.go{margin-top:1rem;width:100%;padding:.8rem;border:0;border-radius:10px;background:var(--acc2);color:#fff;font:bold 1rem inherit;cursor:pointer}
+.go:disabled{opacity:.5}
+#out img{width:100%;border-radius:12px;margin-top:.8rem}
+#out pre{white-space:pre-wrap;font-size:.8rem;background:var(--bg);padding:.6rem;border-radius:8px}
+:focus-visible{outline:3px solid var(--acc2);outline-offset:2px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Arma tu acuario</h1>
+  <p>Elige un tamaño, mira qué especies y plantas le van bien, decóralo y pídele a la IA que lo dibuje.</p>
+</header>
+<main>
+  <section class="tanks" id="tanks" aria-label="Acuarios"></section>
+  <aside id="panel" aria-live="polite"></aside>
+</main>
+
+<script>
+// ===== DATOS (edítalos aquí; "min" = litros mínimos aproximados de guías de acuariofilia) =====
+const TANKS=[ // litros y medidas ESTIMADOS a ojo por la foto: corrígelos con los reales
+ {id:"a01",l:20, cm:"35×25×25", nom:"Nano blanco"},
+ {id:"a02",l:20, cm:"35×25×25", nom:"Nano con tapa abierta"},
+ {id:"a03",l:25, cm:"40×25×25", nom:"Nano negro"},
+ {id:"a04",l:60, cm:"60×30×35", nom:"Gris con filtro"},
+ {id:"a05",l:70, cm:"60×30×40", nom:"Rectangular sobre mesa"},
+ {id:"a06",l:70, cm:"60×30×40", nom:"Blanco con mueble"},
+ {id:"a07",l:100,cm:"70×35×40", nom:"Negro con luz azul"},
+ {id:"a08",l:100,cm:"80×35×35", nom:"Largo transparente"},
+ {id:"a09",l:160,cm:"100×40×40",nom:"Con mueble negro"},
+ {id:"a10",l:200,cm:"100×40×50",nom:"Grande con mueble"},
+ {id:"a11",l:200,cm:"110×40×45",nom:"Grande junto a la ventana"}];
+const FISH=[
+ {id:"f01",n:"Pleco",min:100,en:"bristlenose pleco"},
+ {id:"f02",n:"Betta",min:20,en:"betta fish"},
+ {id:"f03",n:"Corydora",min:60,en:"group of corydoras catfish",grupo:1},
+ {id:"f04",n:"Danio cebra",min:40,en:"school of zebra danios",grupo:1},
+ {id:"f05",n:"Escalar",min:150,en:"angelfish"},
+ {id:"f06",n:"Guppy",min:40,en:"guppies",grupo:1},
+ {id:"f07",n:"Gurami perlado",min:120,en:"pearl gourami"},
+ {id:"f08",n:"Neón",min:40,en:"school of neon tetras",grupo:1}];
+// Renombra las plantas "de tallo" y los musgos según tu Word
+const PLANTS=[
+ {id:"p01",n:"Planta de tallo A",min:20,en:"stem plant"},
+ {id:"p02",n:"Anubias",min:20,en:"anubias"},
+ {id:"p03",n:"Espada amazónica",min:100,en:"amazon sword plant"},
+ {id:"p04",n:"Helecho de Java",min:20,en:"java fern"},
+ {id:"p05",n:"Planta de tallo B",min:20,en:"hornwort-like stem plant"},
+ {id:"p06",n:"Lechuga de agua",min:40,en:"floating water lettuce"},
+ {id:"p07",n:"Musgo de Java",min:10,en:"java moss on driftwood"},
+ {id:"p08",n:"Musgo 2",min:10,en:"moss carpet"},
+ {id:"p09",n:"Vallisneria",min:60,en:"tall vallisneria"},
+ {id:"p10",n:"Planta de tallo C",min:20,en:"hygrophila stem plant"}];
+const DECOR=[
+ {n:"🪨 Rocas",en:"smooth rocks"},{n:"🪵 Tronco",en:"driftwood"},{n:"🕳️ Cueva",en:"a small cave"},
+ {n:"🏠 Casa de roca",en:"a little stone house"},{n:"🛖 Casa de madera",en:"a little wooden house"},
+ {n:"🚢 Barco hundido",en:"a sunken pirate ship"},{n:"🌳 Árbol",en:"a decorative tree"},
+ {n:"☀️ Sol de juguete",en:"a toy sun ornament"},{n:"🌙 Luna de juguete",en:"a toy moon ornament"},
+ {n:"🚗 Carro de juguete",en:"a toy car"}];
+const AGUA={"Cristalina":["#9fdce8","crystal clear"],"Azulada":["#4d9bd6","blue-tinted"],"Verdosa":["#6fbf8a","green-tinted"],"Noche violeta":["#7a5fb0","deep violet moonlight"]};
+const SUST={"Arena clara":"light sand","Grava oscura":"dark gravel","Grava de colores":"colorful gravel"};
+
+// ===== ESTADO =====
+const S={tank:null,hover:null,fish:new Set(),plants:new Set(),decor:new Set(),agua:"Cristalina",sust:"Arena clara",extra:""};
+const $=(s)=>document.querySelector(s);
+
+const T=id=>TANKS.find(x=>x.id===id);
+function drawTanks(){
+  $("#tanks").innerHTML=TANKS.map(t=>`<button class="tank" data-id="${t.id}" aria-pressed="${S.tank===t.id}">
+    <img src="imagenes/${t.id}.jpg" alt="Acuario ${t.nom}, ${t.l} litros"><b>${t.nom} · ${t.l} L</b><small>${t.cm} cm</small></button>`).join("");
+  document.querySelectorAll(".tank").forEach(b=>{
+    const id=b.dataset.id;
+    b.onmouseenter=b.onfocus=()=>{S.hover=id;drawPanel()};
+    b.onmouseleave=b.onblur=()=>{S.hover=null;drawPanel()};
+    b.onclick=()=>{S.tank=id;const l=T(id).l;[...S.fish].forEach(x=>{if(F(x).min>l)S.fish.delete(x)});
+      [...S.plants].forEach(x=>{if(P(x).min>l)S.plants.delete(x)});drawTanks();drawPanel()};
+  });
+}
+const F=id=>FISH.find(x=>x.id===id), P=id=>PLANTS.find(x=>x.id===id);
+const chips=(arr,set,L,kind)=>arr.map(x=>{const ok=x.min<=L;
+  return `<button class="chip" data-k="${kind}" data-id="${x.id}" aria-pressed="${set.has(x.id)}" ${ok?"":"disabled"} title="${ok?"":"Necesita unos "+x.min+" L"}">
+  <img src="imagenes/${x.id}.jpg" alt="">${x.n}${ok?"":" ("+x.min+" L)"}</button>`}).join("");
+
+function drawPanel(){
+  const cur=S.hover||S.tank, p=$("#panel");
+  if(!cur){p.innerHTML=`<h2>Elige un acuario</h2><p class="note">Pasa el cursor sobre uno para ver qué especies le van. Haz clic para armarlo.</p>`;return}
+  const t=T(cur), L=t.l, fits=FISH.filter(f=>f.min<=L), pl=PLANTS.filter(x=>x.min<=L);
+  if(S.hover&&S.hover!==S.tank){
+    p.innerHTML=`<h2>${t.nom} · ${t.l} L</h2><p class="note">${t.cm} cm. Haz clic para elegirlo.</p>
+    <div class="grp">Peces que caben (${fits.length})</div><div class="chips">${fits.map(f=>`<span class="chip"><img src="imagenes/${f.id}.jpg" alt="">${f.n}</span>`).join("")}</div>
+    <div class="grp">Plantas que caben (${pl.length})</div><div class="chips">${pl.map(f=>`<span class="chip"><img src="imagenes/${f.id}.jpg" alt="">${f.n}</span>`).join("")}</div>`;return}
+  const warn=(S.fish.has("f02")&&S.fish.size>1)?`<p class="warn">Ojo: el betta puede acosar a peces de colas largas como el guppy. Consulta con un especialista.</p>`:"";
+  p.innerHTML=`<h2>${t.nom} · ${t.l} L</h2><p class="note">${t.cm} cm</p>
+  <div class="grp">Peces</div><div class="chips">${chips(FISH,S.fish,L,"fish")}</div>${warn}
+  <div class="grp">Plantas</div><div class="chips">${chips(PLANTS,S.plants,L,"plants")}</div>
+  <div class="grp">Decoración</div><div class="chips">${DECOR.map((d,i)=>`<button class="chip t" data-k="decor" data-id="${i}" aria-pressed="${S.decor.has(i)}">${d.n}</button>`).join("")}</div>
+  <div class="row"><div><div class="grp">Agua</div><select id="agua">${Object.keys(AGUA).map(k=>`<option ${k===S.agua?"selected":""}>${k}</option>`)}</select></div>
+  <div><div class="grp">Fondo</div><select id="sust">${Object.keys(SUST).map(k=>`<option ${k===S.sust?"selected":""}>${k}</option>`)}</select></div></div>
+  <div class="grp"><label for="extra">¿Qué otra cosa quieres añadir?</label></div>
+  <textarea id="extra" rows="3" placeholder="Ej: un faro pequeño, un castillo de piedra, una tortuga de juguete">${S.extra}</textarea>
+  <button class="go" id="go">Generar mi acuario con IA</button><div id="out"></div>`;
+  p.querySelectorAll(".chip[data-k]").forEach(b=>b.onclick=()=>{
+    const k=b.dataset.k, id=k==="decor"?+b.dataset.id:b.dataset.id, set=S[k];
+    set.has(id)?set.delete(id):set.add(id); S.extra=$("#extra").value; drawPanel()});
+  $("#agua").onchange=e=>{S.agua=e.target.value;S.extra=$("#extra").value;drawTanks();drawPanel()};
+  $("#sust").onchange=e=>S.sust=e.target.value;
+  $("#extra").oninput=e=>S.extra=e.target.value;
+  $("#go").onclick=generar;
+}
+
+function armarPrompt(){
+  const t=T(S.tank);
+  const f=[...S.fish].map(id=>F(id).en), pl=[...S.plants].map(id=>P(id).en), d=[...S.decor].map(i=>DECOR[i].en);
+  return `Photorealistic front view of a freshwater home aquarium, ${t.cm} cm (${t.l} liters), ${AGUA[S.agua][1]} water, ${SUST[S.sust]} substrate. `+
+   (f.length?`Fish: ${f.join(", ")}. `:"No fish. ")+(pl.length?`Aquatic plants: ${pl.join(", ")}. `:"")+
+   (d.length?`Decorations: ${d.join(", ")}. `:"")+(S.extra.trim()?`Also include: ${S.extra.trim()}. `:"")+
+   `Natural proportions for the tank size, balanced layout, soft aquarium lighting, no text, no watermark.`;
+}
+async function generar(){
+  const out=$("#out"), btn=$("#go"), prompt=armarPrompt();
+  btn.disabled=true; out.innerHTML=`<p class="note">Creando tu acuario… puede tardar unos segundos.</p>`;
+  try{
+    const r=await fetch("/.netlify/functions/generar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt})});
+    const j=await r.json(); if(!r.ok||!j.image) throw new Error(j.error||"Error");
+    out.innerHTML=`<img src="${j.image}" alt="Tu acuario generado con IA"><p class="note">Imagen generada con IA a partir de tu selección.</p>`;
+  }catch(e){
+    out.innerHTML=`<p class="warn">No se pudo generar la imagen (${e.message}). Este es el texto que se enviaría a la IA:</p><pre>${prompt}</pre>`;
+  }
+  btn.disabled=false;
+}
+drawTanks();drawPanel();
+</script>
+</body>
+</html>
